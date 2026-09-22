@@ -56,7 +56,48 @@ app.post('/api/add', upload.single('file'), (req, res) => {
     posts.unshift(newPost);
     tokenObj.used = true; // mark token as used
 
+    // Optional: Outgoing webhook to notify Discord/Slack when a new post is created
+    if (process.env.WEBHOOK_URL) {
+        fetch(process.env.WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: `New post added: ${text_content}` })
+        }).catch(err => console.error("Failed to trigger webhook:", err));
+    }
+
     res.redirect('/');
+});
+
+// Incoming Webhook to programmatically add posts
+app.post('/api/webhook', (req, res) => {
+    const { token, text_content, media_url } = req.body;
+    const tokenObj = tokens.find(t => t.token === token && !t.used);
+
+    if (!tokenObj) {
+        return res.status(401).json({ error: 'Invalid or already used token.' });
+    }
+
+    const newPost = {
+        id: Date.now(),
+        text_content: text_content || '',
+        media_data: media_url || null, // accept a URL for media instead of file upload
+        media_type: media_url ? (media_url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'photo') : null,
+        timestamp: new Date().toISOString()
+    };
+
+    posts.unshift(newPost);
+    tokenObj.used = true;
+
+    // Trigger outgoing webhook if set
+    if (process.env.WEBHOOK_URL) {
+        fetch(process.env.WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: `New post added via webhook: ${text_content}` })
+        }).catch(err => console.error("Failed to trigger webhook:", err));
+    }
+
+    res.status(200).json({ success: true, post: newPost });
 });
 
 if (require.main === module) {
