@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Tracker & Posts</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; max-width: 600px; margin: auto; line-height: 1.6; }
+        .post { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+        img, video { max-width: 100%; margin-top: 15px; border-radius: 5px; }
+        form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; padding: 20px; background: #f4f4f4; border-radius: 8px; }
+        .time { color: #888; font-size: 0.9em; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;}
+        input, textarea, button { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #0070f3; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #005bb5; }
+        .admin-panel { margin-bottom: 20px; padding: 15px; border: 1px dashed #0070f3; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Post Feed</h1>
+    
+    <div class="admin-panel">
+        <button onclick="generateToken()">Generate Token (Admin)</button>
+        <p id="token-display"></p>
+    </div>
+
+    <form action="/api/add" method="POST" enctype="multipart/form-data">
+        <h3>Create a New Post</h3>
+        <input type="text" name="token" placeholder="Enter your token here..." required>
+        <textarea name="text_content" rows="4" placeholder="What's on your mind?"></textarea>
+        <label>Attach Photo/Video (Optional):</label>
+        <input type="file" name="file" accept="image/*,video/*">
+        <button type="submit">Post</button>
+    </form>
+
+    <h2>Recent Posts</h2>
+    <div id="posts">Loading...</div>
+
+    <script>
+        async function generateToken() {
+            try {
+                const res = await fetch('/api/generate-token');
+                const data = await res.json();
+                document.getElementById('token-display').innerHTML = `<b>${data.token}</b> <br><small>(Copy this token to use below!)</small>`;
+            } catch (err) {
+                alert("Failed to generate token");
+            }
+        }
+
+        async function loadPosts() {
+            try {
+                const res = await fetch('/api/posts');
+                const posts = await res.json();
+                const container = document.getElementById('posts');
+                container.innerHTML = '';
+                
+                if (posts.length === 0) {
+                    container.innerHTML = '<p>No posts yet. Be the first to post!</p>';
+                    return;
+                }
+
+                posts.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'post';
+                    const date = new Date(p.timestamp).toLocaleString();
+                    
+                    let mediaHtml = '';
+                    if (p.media_data) {
+                        if (p.media_type === 'photo') {
+                            mediaHtml = `<img src="${p.media_data}" alt="User photo">`;
+                        } else if (p.media_type === 'video') {
+                            mediaHtml = `<video controls src="${p.media_data}"></video>`;
+                        }
+                    }
+
+                    div.innerHTML = `
+                        <div class="time">🕒 Posted on: ${date}</div>
+                        <div>${p.text_content.replace(/\n/g, '<br>')}</div>
+                        ${mediaHtml}
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (err) {
+                document.getElementById('posts').innerHTML = '<p>Error loading posts.</p>';
+            }
+        }
+        
+        loadPosts();
+    </script>
+</body>
+</html>
